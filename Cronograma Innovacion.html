@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Planificador de Capacidades - Reglas Automáticas</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome para iconos -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="bg-gray-50 font-sans p-4 antialiased text-gray-700">
+
+    <div class="max-w-[1400px] mx-auto bg-white rounded-lg shadow border border-gray-200 overflow-hidden">
+        
+        <!-- ENCABEZADO: LUNES A VIERNES -->
+        <div class="grid grid-cols-6 border-b border-gray-200 text-center bg-gray-50 text-xs text-gray-500">
+            <div class="p-3 border-r border-gray-200 text-left bg-white">
+                <div class="font-bold text-sm text-gray-800">julio de 2026</div>
+                <div class="text-[10px] text-gray-400 mt-1">Planificación de Turnos Inteligente</div>
+            </div>
+            <!-- Lunes -->
+            <div class="p-2 border-r border-gray-200 flex flex-col justify-between bg-blue-50/60">
+                <div class="flex justify-between items-center px-1">
+                    <span class="font-bold text-lg text-blue-600 bg-blue-100 rounded-full w-7 h-7 flex items-center justify-center">6</span>
+                    <span class="text-gray-400"><i class="fa-solid fa-users text-[10px]"></i> 5</span>
+                </div>
+                <div class="text-right font-bold text-blue-600">lun</div>
+            </div>
+            <!-- Martes -->
+            <div class="p-2 border-r border-gray-200 flex flex-col justify-between">
+                <div class="flex justify-between items-center px-1">
+                    <span class="font-bold text-lg text-gray-800">7</span>
+                    <span class="text-gray-400"><i class="fa-solid fa-users text-[10px]"></i> 5</span>
+                </div>
+                <div class="text-right font-medium text-gray-600">mar</div>
+            </div>
+            <!-- Miércoles -->
+            <div class="p-2 border-r border-gray-200 flex flex-col justify-between">
+                <div class="flex justify-between items-center px-1">
+                    <span class="font-bold text-lg text-gray-800">8</span>
+                    <span class="text-gray-400"><i class="fa-solid fa-users text-[10px]"></i> 5</span>
+                </div>
+                <div class="text-right font-medium text-gray-600">mié</div>
+            </div>
+            <!-- Jueves -->
+            <div class="p-2 border-r border-gray-200 flex flex-col justify-between">
+                <div class="flex justify-between items-center px-1">
+                    <span class="font-bold text-lg text-gray-800">9</span>
+                    <span class="text-gray-400"><i class="fa-solid fa-users text-[10px]"></i> 5</span>
+                </div>
+                <div class="text-right font-medium text-gray-600">jue</div>
+            </div>
+            <!-- Viernes -->
+            <div class="p-2 flex flex-col justify-between">
+                <div class="flex justify-between items-center px-1">
+                    <span class="font-bold text-lg text-gray-800">10</span>
+                    <span class="text-gray-400"><i class="fa-solid fa-users text-[10px]"></i> 5</span>
+                </div>
+                <div class="text-right font-medium text-gray-600">vie</div>
+            </div>
+        </div>
+
+        <!-- BARRA DE GUÍA DE COLORES AUTOMÁTICOS -->
+        <div class="flex justify-between items-center px-4 py-2 bg-gray-100/70 border-b border-gray-200 text-xs">
+            <div class="flex flex-wrap gap-4 items-center">
+                <span class="font-bold text-gray-700">Detección de colores:</span>
+                <span class="flex items-center gap-1"><span class="w-3 h-3 bg-green-200 border-l-2 border-green-500 inline-block"></span> Normal (5:00 / 4:30)</span>
+                <span class="flex items-center gap-1"><span class="w-3 h-3 bg-orange-100 border-l-2 border-orange-400 inline-block"></span> Salida 4:00</span>
+                <span class="flex items-center gap-1"><span class="w-3 h-3 bg-blue-100 border-l-2 border-blue-400 inline-block"></span> Medio Día (12:30 o Tarde)</span>
+                <span class="flex items-center gap-1"><span class="w-3 h-3 bg-purple-100 border-l-2 border-purple-400 inline-block"></span> Fuera de Oficina</span>
+            </div>
+            <button onclick="agregarMiembro()" class="flex items-center space-x-1 border border-gray-300 text-xs font-semibold px-3 py-1 rounded text-gray-700 shadow-sm bg-white hover:bg-gray-50 transition">
+                <span><i class="fa-solid fa-user-plus text-[11px]"></i></span>
+                <span>Agregar miembro</span>
+            </button>
+        </div>
+
+        <!-- CUADRÍCULA PRINCIPAL -->
+        <div class="grid grid-cols-6 divide-x divide-gray-200" id="tabla-turnos">
+            
+            <!-- COLUMNA INTEGRANTES -->
+            <div class="bg-gray-50/50 divide-y divide-gray-200 text-xs" id="columna-miembros">
+                <div class="p-3 h-20 flex items-center space-x-2 bg-gray-50 border-b border-gray-200">
+                    <div class="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-gray-500"><i class="fa-solid fa-shuffle text-xs"></i></div>
+                    <div><div class="font-semibold text-gray-700">Turnos libres</div><div class="text-[10px] text-gray-400">0 turnos</div></div>
+                </div>
+            </div>
+
+            <!-- COLUMNAS DE DÍAS -->
+            <div class="divide-y divide-gray-200 p-1 space-y-1 bg-blue-50/5" id="dia-lun"></div>
+            <div class="divide-y divide-gray-200 p-1 space-y-1 bg-white" id="dia-mar"></div>
+            <div class="divide-y divide-gray-200 p-1 space-y-1 bg-white" id="dia-mie"></div>
+            <div class="divide-y divide-gray-200 p-1 space-y-1 bg-white" id="dia-jue"></div>
+            <div class="divide-y divide-gray-200 p-1 space-y-1 bg-white" id="dia-vie"></div>
+
+        </div>
+    </div>
+
+    <!-- VENTANA MODAL PARA EDITAR -->
+    <div id="modal-editor" class="fixed inset-0 bg-black/50 hidden flex items-center justify-center z-50">
+        <div class="bg-white rounded-lg shadow-xl border p-6 w-full max-w-md">
+            <h3 class="text-base font-bold text-gray-800 mb-4">Editar Datos del Turno</h3>
+            
+            <div class="space-y-4 text-sm">
+                <div>
+                    <label class="block text-xs font-semibold text-gray-500 mb-1">Horario o Estado del Turno</label>
+                    <input type="text" id="input-horario" class="w-full border p-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Ej: 7:30 a.m. - 12:30 m. o Fuera de oficina">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-500 mb-1">Celular / Información Adicional</label>
+                    <input type="text" id="input-info" class="w-full border p-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+            </div>
+
+            <div class="flex justify-between items-center mt-6">
+                <button onclick="borrarTurno()" class="text-xs text-red-600 hover:underline font-semibold">Eliminar Turno</button>
+                <div class="space-x-2">
+                    <button onclick="cerrarModal()" class="px-4 py-2 border rounded text-xs font-semibold text-gray-500 hover:bg-gray-50">Cancelar</button>
+                    <button onclick="guardarCambiosTurno()" class="px-4 py-2 bg-blue-600 text-white rounded text-xs font-semibold hover:bg-blue-700">Guardar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- SCRIPT DE LOGICA INTERACTIVA CON FILTROS AVANZADOS -->
+    <script>
+        let equipo = [
+            { id: 1, nombre: "Luis Miguel Medina", infoCel: "3176888687", inicial: "L", colorBg: "bg-teal-600", turnos: { lun: { h: "7:30 a.m. - 5:00 p.m.", info: "3176888687" }, mar: { h: "7:30 a.m. - 5:00 p.m.", info: "3176888687" }, mie: { h: "7:30 a.m. - 5:00 p.m.", info: "3176888687" }, jue: { h: "7:30 a.m. - 5:00 p.m.", info: "3176888687" }, vie: { h: "7:30 a.m. - 4:00 p.m.", info: "3176888687" } } },
+            { id: 2, nombre: "Andrés Felipe Granada", infoCel: "3204576468", inicial: "A", colorBg: "bg-indigo-600", turnos: { lun: { h: "7:00 a.m. - 4:30 p.m.", info: "3204576468" }, mar: { h: "7:00 a.m. - 4:30 p.m.", info: "3204576468" }, mie: { h: "7:00 a.m. - 4:30 p.m.", info: "3204576468" }, jue: { h: "7:00 a.m. - 4:00 p.m.", info: "3204576468" }, vie: { h: "7:00 a.m. - 4:00 p.m.", info: "3204576468" } } },
+            { id: 3, nombre: "Juan José Cerón", infoCel: "3136781922", inicial: "J", colorBg: "bg-pink-600", turnos: { lun: { h: "7:30 a.m. - 5:00 p.m.", info: "3136781922" }, mar: { h: "7:30 a.m. - 12:30 a.m.", info: "3136781922" }, mie: { h: "7:30 a.m. - 4:00 p.m.", info: "3136781922" }, jue: { h: "7:30 a.m. - 5:00 p.m.", info: "3136781922" }, vie: { h: "7:30 a.m. - 5:00 p.m.", info: "3136781922" } } },
+            { id: 4, nombre: "Aaron Puentes", infoCel: "3161354130", inicial: "A", colorBg: "bg-emerald-600", turnos: { lun: { h: "7:30 a.m. - 5:00 p.m.", info: "3161354130" }, mar: { h: "7:30 a.m. - 5:00 p.m.", info: "3161354130" }, mie: { h: "7:30 a.m. - 5:00 p.m.", info: "3161354130" }, jue: { h: "7:30 a.m. - 5:00 p.m.", info: "3161354130" }, vie: { h: "7:30 a.m. - 4:00 p.m.", info: "3161354130" } } },
+            { id: 5, nombre: "Angela Maria Lopez", infoCel: "3150493113", inicial: "A", colorBg: "bg-blue-900", turnos: { lun: { h: "7:30 a.m. - 5:00 p.m.", info: "3150493113" }, mar: { h: "7:30 a.m. - 5:00 p.m.", info: "3150493113" }, mie: { h: "7:30 a.m. - 12:30 m.", info: "3150493113" }, jue: { h: "7:30 a.m. - 5:00 p.m.", info: "3150493113" }, vie: { h: "7:30 a.m. - 4:00 p.m.", info: "3150493113" } } }
+        ];
+
+        let diasClaves = ['lun', 'mar', 'mie', 'jue', 'vie'];
+        let celdaSeleccionada = { miembroId: null, dia: null };
+
+        // EVALUADOR AUTOMÁTICO DE TEXTO PARA ASIGNACIÓN DE COLORES
+        function analizarTextoTurno(texto) {
+            if (!texto) return { estilo: "bg-white", icono: "" };
+            
+            let t = texto.toLowerCase();
+
+            // 1. FUERA DE OFICINA -> PÚRPURA
+            if (t.includes("fuera") || t.includes("permiso") || t.includes("vacaciones") || t.includes("remoto") || t.includes("no asiste")) {
+                return { estilo: "bg-purple-100 border-l-4 border-purple-400 text-purple-700 font-medium", icono: '<i class="fa-solid fa-house-laptop text-purple-500 text-[10px]"></i>' };
+            }
+            
+            // 2. MEDIO DÍA (Mañana o Tarde) -> AZUL CLARO
+            if (t.includes("12:30") || t.includes("2:00") || t.includes("medio") || t.includes("media")) {
+                return { estilo: "bg-blue-50 border-l-4 border-blue-400 text-blue-700 font-medium", icono: '<i class="fa-solid fa-business-time text-blue-500 text-[10px]"></i>' };
+            }
+
+            // 3. SALIDA A LAS 4:00 -> NARANJA
+            if (t.includes("4:00") || t.includes("4 p.m.")) {
+                return { estilo: "bg-orange-50 border-l-4 border-orange-400 text-orange-700 font-medium", icono: '<i class="fa-solid fa-clock text-orange-500 text-[10px]"></i>' };
+            }
+            
+            // 4. HORARIO COMPLETO ESTÁNDAR -> VERDE
+            return { estilo: "bg-green-50 border-l-4 border-green-400 text-green-700", icono: "" };
+        }
+
+        function renderizarTabla() {
+            document.getElementById('columna-miembros').innerHTML = `
+                <div class="p-3 h-20 flex items-center space-x-2 bg-gray-50 border-b border-gray-200">
+                    <div class="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-gray-500"><i class="fa-solid fa-shuffle text-xs"></i></div>
+                    <div><div class="font-semibold text-gray-700">Turnos libres</div><div class="text-[10px] text-gray-400">0 turnos</div></div>
+                </div>`;
+            
+            diasClaves.forEach(dia => {
+                document.getElementById(`dia-${dia}`).innerHTML = `<div class="h-[76px] border-b border-gray-200"></div>`;
+            });
+
+            equipo.forEach(miembro => {
+                let divMiembro = document.createElement('div');
+                divMiembro.className = "p-3 h-24 flex items-center space-x-2 border-b border-gray-200 bg-gray-50/40";
+                divMiembro.innerHTML = `
+                    <div class="w-8 h-8 rounded-full ${miembro.colorBg} flex items-center justify-center text-white font-bold text-[13px]">${miembro.inicial}</div>
+                    <div>
+                        <div class="font-bold text-gray-800 truncate max-w-[200px]">${miembro.nombre}</div>
+                        <div class="text-[10px] text-gray-400">Cel: ${miembro.infoCel}</div>
+                    </div>`;
+                document.getElementById('columna-miembros').appendChild(divMiembro);
+
+                diasClaves.forEach(dia => {
+                    let turno = miembro.turnos[dia];
+                    let contenedorDia = document.getElementById(`dia-${dia}`);
+                    let divCelda = document.createElement('div');
+                    divCelda.className = "h-[92px] p-0.5 border-b border-gray-200/60 flex flex-col justify-center";
+
+                    if (turno && turno.h.trim() !== "") {
+                        let analisis = analizarTextoTurno(turno.h);
+
+                        divCelda.innerHTML = `
+                            <div class="${analisis.estilo} h-full rounded p-2 text-[11px] flex flex-col justify-between shadow-sm cursor-pointer hover:brightness-95 transition select-none" 
+                                 ondblclick="abrirEditor(${miembro.id}, '${dia}')">
+                                <div class="font-semibold truncate">${turno.h}</div>
+                                <div class="font-mono text-[10px] text-gray-500 flex justify-between items-center">
+                                    <span>${turno.info}</span>
+                                    ${analisis.icono}
+                                </div>
+                            </div>`;
+                    } else {
+                        divCelda.innerHTML = `
+                            <div class="h-full w-full rounded hover:bg-gray-100 cursor-pointer transition" 
+                                 ondblclick="abrirEditor(${miembro.id}, '${dia}')"></div>`;
+                    }
+                    contenedorDia.appendChild(divCelda);
+                });
+            });
+        }
+
+        function abrirEditor(miembroId, dia) {
+            celdaSeleccionada = { miembroId, dia };
+            let miembro = equipo.find(m => m.id === miembroId);
+            let turno = miembro.turnos[dia];
+
+            if (turno) {
+                document.getElementById('input-horario').value = turno.h;
+                document.getElementById('input-info').value = turno.info;
+            } else {
+                document.getElementById('input-horario').value = "7:30 a.m. - 5:00 p.m.";
+                document.getElementById('input-info').value = miembro.infoCel;
+            }
+            document.getElementById('modal-editor').classList.remove('hidden');
+        }
+
+        function cerrarModal() {
+            document.getElementById('modal-editor').classList.add('hidden');
+        }
+
+        function guardarCambiosTurno() {
+            let { miembroId, dia } = celdaSeleccionada;
+            let miembro = equipo.find(m => m.id === miembroId);
+            let horarioTexto = document.getElementById('input-horario').value.trim();
+
+            if (horarioTexto === "") {
+                miembro.turnos[dia] = null;
+            } else {
+                miembro.turnos[dia] = {
+                    h: horarioTexto,
+                    info: document.getElementById('input-info').value
+                };
+            }
+            cerrarModal();
+            renderizarTabla();
+        }
+
+        function borrarTurno() {
+            let { miembroId, dia } = celdaSeleccionada;
+            let miembro = equipo.find(m => m.id === miembroId);
+            miembro.turnos[dia] = null;
+            cerrarModal();
+            renderizarTabla();
+        }
+
+        function agregarMiembro() {
+            let nombre = prompt("Nombre completo del nuevo integrante:");
+            let cel = prompt("Número de celular:");
+            if (nombre && cel) {
+                let nuevoId = equipo.length + 1;
+                equipo.push({
+                    id: nuevoId,
+                    nombre: nombre,
+                    infoCel: cel,
+                    inicial: nombre.charAt(0).toUpperCase(),
+                    colorBg: "bg-purple-600",
+                    turnos: { lun: null, mar: null, mie: null, jue: null, vie: null }
+                });
+                renderizarTabla();
+            }
+        }
+
+        renderizarTabla();
+    </script>
+</body>
+</html>
