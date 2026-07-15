@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Planificador de Capacidades - Cronograma Dinámico</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @media print { .no-print { display: none !important; } }
+        .dashed-pending { border-style: dashed !important; }
+        ::-webkit-scrollbar { height: 8px; width: 8px; }
+        ::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 4px; }
+    </style>
+</head>
+<body class="bg-gray-50 font-sans p-4 antialiased text-gray-700">
+
+    <!-- INDICADOR DE CARGA -->
+    <div id="loader" class="fixed inset-0 bg-white/80 flex items-center justify-center z-[999]">
+        <div class="text-center text-gray-500">
+            <i class="fa-solid fa-circle-notch fa-spin text-2xl mb-2"></i>
+            <div class="text-xs font-semibold">Cargando cronograma del equipo...</div>
+        </div>
+    </div>
+
+    <div class="max-w-[1400px] mx-auto bg-white rounded-lg shadow border border-gray-200 overflow-hidden">
+
+        <!-- BARRA SUPERIOR: NAVEGACIÓN DE SEMANA Y ACCIONES -->
+        <div class="flex flex-wrap items-center justify-between gap-2 px-4 py-2 bg-white border-b border-gray-200 no-print">
+            <div class="flex items-center gap-2">
+                <button onclick="cambiarSemana(-1)" class="w-7 h-7 flex items-center justify-center border border-gray-300 rounded text-gray-600 hover:bg-gray-50"><i class="fa-solid fa-chevron-left text-xs"></i></button>
+                <div class="text-sm font-bold text-gray-800 min-w-[210px] text-center" id="titulo-semana">—</div>
+                <button onclick="cambiarSemana(1)" class="w-7 h-7 flex items-center justify-center border border-gray-300 rounded text-gray-600 hover:bg-gray-50"><i class="fa-solid fa-chevron-right text-xs"></i></button>
+                <button onclick="irHoy()" class="text-[11px] font-semibold px-2 py-1 border border-gray-300 rounded text-gray-600 hover:bg-gray-50">Hoy</button>
+            </div>
+            <div class="flex items-center gap-2">
+                <button onclick="abrirPanel('solicitudes')" class="relative flex items-center space-x-1 border border-gray-300 text-xs font-semibold px-3 py-1 rounded text-gray-700 shadow-sm bg-white hover:bg-gray-50 transition">
+                    <i class="fa-regular fa-clock text-[11px]"></i><span>Solicitudes</span>
+                    <span id="badge-solicitudes" class="hidden absolute -top-2 -right-2 bg-red-500 text-white text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">0</span>
+                </button>
+                <button onclick="abrirPanel('historial')" class="flex items-center space-x-1 border border-gray-300 text-xs font-semibold px-3 py-1 rounded text-gray-700 shadow-sm bg-white hover:bg-gray-50 transition">
+                    <i class="fa-solid fa-clock-rotate-left text-[11px]"></i><span>Historial</span>
+                </button>
+                <button onclick="exportarCSV()" class="flex items-center space-x-1 border border-gray-300 text-xs font-semibold px-3 py-1 rounded text-gray-700 shadow-sm bg-white hover:bg-gray-50 transition">
+                    <i class="fa-solid fa-file-arrow-down text-[11px]"></i><span>Exportar</span>
+                </button>
+                <button onclick="agregarMiembro()" class="flex items-center space-x-1 border border-gray-300 text-xs font-semibold px-3 py-1 rounded text-gray-700 shadow-sm bg-white hover:bg-gray-50 transition">
+                    <i class="fa-solid fa-user-plus text-[11px]"></i><span>Agregar miembro</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- ENCABEZADO: LUNES A VIERNES (dinámico) -->
+        <div class="grid grid-cols-6 border-b border-gray-200 text-center bg-gray-50 text-xs text-gray-500" id="encabezado-dias">
+        </div>
+
+        <!-- BARRA DE GUÍA DE COLORES -->
+        <div class="flex flex-wrap justify-between items-center gap-2 px-4 py-2 bg-gray-100/70 border-b border-gray-200 text-xs no-print">
+            <div class="flex flex-wrap gap-4 items-center">
+                <span class="font-bold text-gray-700">Leyenda:</span>
+                <span class="flex items-center gap-1"><span class="w-3 h-3 bg-green-50 border-l-2 border-green-400 inline-block"></span> Turno normal</span>
+                <span class="flex items-center gap-1"><span class="w-3 h-3 bg-orange-50 border-l-2 border-orange-400 inline-block"></span> Salida temprana</span>
+                <span class="flex items-center gap-1"><span class="w-3 h-3 bg-blue-50 border-l-2 border-blue-400 inline-block"></span> Medio día</span>
+                <span class="flex items-center gap-1"><span class="w-3 h-3 bg-purple-50 border-l-2 border-purple-400 inline-block"></span> Fuera de oficina</span>
+                <span class="flex items-center gap-1"><span class="w-3 h-3 bg-amber-50 border-l-2 border-amber-400 dashed-pending inline-block"></span> Solicitud pendiente</span>
+            </div>
+            <div class="text-[10px] text-gray-400" id="resumen-huecos">—</div>
+        </div>
+
+        <!-- CUADRÍCULA PRINCIPAL -->
+        <div class="grid grid-cols-6 divide-x divide-gray-200" id="tabla-turnos">
+            <div class="bg-gray-50/50 divide-y divide-gray-200 text-xs" id="columna-miembros"></div>
+            <div class="divide-y divide-gray-200 p-1 space-y-1 bg-blue-50/5" id="dia-lun"></div>
+            <div class="divide-y divide-gray-200 p-1 space-y-1 bg-white" id="dia-mar"></div>
+            <div class="divide-y divide-gray-200 p-1 space-y-1 bg-white" id="dia-mie"></div>
+            <div class="divide-y divide-gray-200 p-1 space-y-1 bg-white" id="dia-jue"></div>
+            <div class="divide-y divide-gray-200 p-1 space-y-1 bg-white" id="dia-vie"></div>
+        </div>
+    </div>
+
+    <!-- MODAL: EDITAR TURNO -->
+    <div id="modal-editor" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50 no-print">
+        <div class="bg-white rounded-lg shadow-xl border p-6 w-full max-w-md">
+            <h3 class="text-base font-bold text-gray-800 mb-1">Editar turno</h3>
+            <div class="text-[11px] text-gray-400 mb-4" id="editor-subtitulo"></div>
+
+            <div class="space-y-4 text-sm">
+                <div>
+                    <label class="block text-xs font-semibold text-gray-500 mb-1">Tipo de turno</label>
+                    <select id="input-tipo" onchange="actualizarCamposEditor()" class="w-full border p-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
+                        <option value="normal">Turno normal</option>
+                        <option value="medio_dia">Medio día</option>
+                        <option value="salida_temprana">Salida temprana</option>
+                        <option value="fuera">Fuera de oficina / permiso</option>
+                        <option value="">Vacío (sin asignar)</option>
+                    </select>
+                </div>
+                <div id="fila-horas" class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-500 mb-1">Hora entrada</label>
+                        <input type="time" id="input-entrada" class="w-full border p-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-500 mb-1">Hora salida</label>
+                        <input type="time" id="input-salida" class="w-full border p-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
+                    </div>
+                </div>
+                <div id="fila-motivo">
+                    <label class="block text-xs font-semibold text-gray-500 mb-1">Motivo / nota</label>
+                    <input type="text" id="input-motivo" placeholder="Ej: cita médica, permiso, remoto" class="w-full border p-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
+                </div>
+            </div>
+
+            <div class="flex justify-between items-center mt-6">
+                <button onclick="borrarTurno()" class="text-xs text-red-600 hover:underline font-semibold">Eliminar turno</button>
+                <div class="space-x-2">
+                    <button onclick="cerrarModal('modal-editor')" class="px-4 py-2 border rounded text-xs font-semibold text-gray-500 hover:bg-gray-50">Cancelar</button>
+                    <button onclick="guardarCambiosTurno()" class="px-4 py-2 bg-blue-600 text-white rounded text-xs font-semibold hover:bg-blue-700">Guardar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: SOLICITAR SALIDA TEMPRANA -->
+    <div id="modal-solicitud" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50 no-print">
+        <div class="bg-white rounded-lg shadow-xl border p-6 w-full max-w-md">
+            <h3 class="text-base font-bold text-gray-800 mb-1"><i class="fa-solid fa-door-open text-orange-500 mr-1"></i> Solicitar salida temprana</h3>
+            <div class="text-[11px] text-gray-400 mb-4" id="solicitud-subtitulo"></div>
+            <div class="space-y-4 text-sm">
+                <div>
+                    <label class="block text-xs font-semibold text-gray-500 mb-1">Nueva hora de salida</label>
+                    <input type="time" id="input-hora-solicitud" class="w-full border p-2 rounded focus:outline-none focus:ring-2 focus:ring-orange-400 text-sm">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-500 mb-1">Motivo</label>
+                    <input type="text" id="input-motivo-solicitud" placeholder="Ej: cita médica" class="w-full border p-2 rounded focus:outline-none focus:ring-2 focus:ring-orange-400 text-sm">
+                </div>
+            </div>
+            <div class="flex justify-end items-center mt-6 space-x-2">
+                <button onclick="cerrarModal('modal-solicitud')" class="px-4 py-2 border rounded text-xs font-semibold text-gray-500 hover:bg-gray-50">Cancelar</button>
+                <button onclick="enviarSolicitud()" class="px-4 py-2 bg-orange-500 text-white rounded text-xs font-semibold hover:bg-orange-600">Enviar solicitud</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- PANEL LATERAL: SOLICITUDES / HISTORIAL -->
+    <div id="panel-lateral" class="fixed inset-0 z-50 hidden no-print">
+        <div class="absolute inset-0 bg-black/40" onclick="cerrarPanel()"></div>
+        <div class="absolute right-0 top-0 h-full w-full max-w-md bg-white shadow-xl flex flex-col">
+            <div class="flex border-b border-gray-200">
+                <button id="tab-solicitudes" onclick="cambiarTab('solicitudes')" class="flex-1 py-3 text-xs font-bold text-gray-600 border-b-2 border-transparent">Solicitudes pendientes</button>
+                <button id="tab-historial" onclick="cambiarTab('historial')" class="flex-1 py-3 text-xs font-bold text-gray-600 border-b-2 border-transparent">Historial</button>
+                <button onclick="cerrarPanel()" class="px-4 text-gray-400 hover:text-gray-600"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="flex-1 overflow-y-auto p-4 space-y-2 text-sm" id="contenido-panel"></div>
+        </div>
+    </div>
+
+    <script>
+        // ---------- ESTADO ----------
+        let equipo = [];
+        let solicitudes = [];
+        let historial = [];
+        let semanaActual = {}; // { memberId: { lun: {tipo,entrada,salida,motivo}, ... } }
+        let weekKey = "";
+        let celdaSeleccionada = { miembroId: null, dia: null };
+        let solicitudContexto = { miembroId: null, dia: null };
+        let tabActivo = 'solicitudes';
+        const diasClaves = ['lun', 'mar', 'mie', 'jue', 'vie'];
+        const diasLabel = { lun: 'lun', mar: 'mar', mie: 'mié', jue: 'jue', vie: 'vie' };
+        const paletaColores = ['bg-teal-600','bg-indigo-600','bg-pink-600','bg-emerald-600','bg-blue-900','bg-purple-600','bg-rose-600','bg-amber-600','bg-cyan-600','bg-fuchsia-600'];
+
+        // ---------- STORAGE HELPERS (localStorage: guarda los datos en este navegador/equipo) ----------
+        const PREFIJO = 'cronograma_v3:';
+        async function leer(key, porDefecto) {
+            try {
+                const raw = localStorage.getItem(PREFIJO + key);
+                return raw ? JSON.parse(raw) : porDefecto;
+            } catch (e) { return porDefecto; }
+        }
+        async function guardar(key, value) {
+            try { localStorage.setItem(PREFIJO + key, JSON.stringify(value)); }
+            catch (e) { console.error('Error guardando', key, e); alert('No se pudo guardar el cambio en este navegador. Verifica que no estés en modo incógnito ni con el almacenamiento lleno.'); }
+        }
+
+        // ---------- FECHAS ----------
+        function lunesDe(d) {
+            const date = new Date(d); const day = date.getDay();
+            const diff = (day === 0 ? -6 : 1 - day);
+            date.setDate(date.getDate() + diff); date.setHours(0,0,0,0);
+            return date;
+        }
+        function pad(n) { return n.toString().padStart(2, '0'); }
+        function isoDate(d) { return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
+        function addDays(d, n) { const r = new Date(d); r.setDate(r.getDate() + n); return r; }
+        function fmtHora(hhmm) {
+            if (!hhmm) return '';
+            let [h, m] = hhmm.split(':').map(Number);
+            const suf = h < 12 ? 'a.m.' : 'p.m.';
+            let h12 = h % 12; if (h12 === 0) h12 = 12;
+            return `${h12}:${pad(m)} ${suf}`;
+        }
+        function horasTurno(t) {
+            if (!t || !t.entrada || !t.salida) return 0;
+            const [h1, m1] = t.entrada.split(':').map(Number);
+            const [h2, m2] = t.salida.split(':').map(Number);
+            const mins = (h2 * 60 + m2) - (h1 * 60 + m1);
+            return mins > 0 ? mins / 60 : 0;
+        }
+
+        // ---------- DATOS SEMILLA ----------
+        function equipoSemilla() {
+            return [
+                { id: 1, nombre: "Luis Miguel Medina", infoCel: "3176888687", inicial: "L", colorBg: "bg-teal-600" },
+                { id: 2, nombre: "Andrés Felipe Granada", infoCel: "3204576468", inicial: "A", colorBg: "bg-indigo-600" },
+                { id: 3, nombre: "Juan José Cerón", infoCel: "3136781922", inicial: "J", colorBg: "bg-pink-600" },
+                { id: 4, nombre: "Aaron Puentes", infoCel: "3161354130", inicial: "A", colorBg: "bg-emerald-600" },
+                { id: 5, nombre: "Angela Maria Lopez", infoCel: "3150493113", inicial: "A", colorBg: "bg-blue-900" }
+            ];
+        }
+        function semanaSemilla() {
+            const base = { entrada: "07:30", salida: "17:00", tipo: "normal", motivo: "" };
+            const viernesTemprano = { entrada: "07:30", salida: "16:00", tipo: "salida_temprana", motivo: "" };
+            return {
+                1: { lun: {...base}, mar: {...base}, mie: {...base}, jue: {...base}, vie: {...viernesTemprano} },
+                2: { lun: {entrada:"07:00",salida:"16:30",tipo:"normal",motivo:""}, mar: {entrada:"07:00",salida:"16:30",tipo:"normal",motivo:""}, mie: {entrada:"07:00",salida:"16:30",tipo:"normal",motivo:""}, jue: {entrada:"07:00",salida:"16:00",tipo:"salida_temprana",motivo:""}, vie: {entrada:"07:00",salida:"16:00",tipo:"salida_temprana",motivo:""} },
+                3: { lun: {...base}, mar: {entrada:"07:30",salida:"12:30",tipo:"medio_dia",motivo:""}, mie: {entrada:"07:30",salida:"16:00",tipo:"salida_temprana",motivo:""}, jue: {...base}, vie: {...base} },
+                4: { lun: {...base}, mar: {...base}, mie: {...base}, jue: {...base}, vie: {...viernesTemprano} },
+                5: { lun: {...base}, mar: {...base}, mie: {entrada:"07:30",salida:"12:30",tipo:"medio_dia",motivo:""}, jue: {...base}, vie: {...viernesTemprano} }
+            };
+        }
+
+        // ---------- CARGA INICIAL ----------
+        async function iniciar() {
+            equipo = await leer('equipo', null);
+            if (!equipo) { equipo = equipoSemilla(); await guardar('equipo', equipo); }
+            solicitudes = await leer('solicitudes', []);
+            historial = await leer('historial', []);
+
+            const hoy = new Date();
+            const monday = lunesDe(hoy);
+            weekKey = isoDate(monday);
+
+            await cargarSemana(true);
+            document.getElementById('loader').classList.add('hidden');
+        }
+
+        async function cargarSemana(esSemillaInicial) {
+            const monday = new Date(weekKey);
+            const esperado = isoDate(lunesDe(new Date()));
+            let datos = await leer(`semana:${weekKey}`, null);
+            if (!datos) {
+                datos = (weekKey === esperado && esSemillaInicial) ? semanaSemilla() : {};
+                if (weekKey === esperado && esSemillaInicial) await guardar(`semana:${weekKey}`, datos);
+            }
+            semanaActual = datos;
+            renderizarEncabezado();
+            renderizarTabla();
+            actualizarBadges();
+        }
+
+        function fechasSemana() {
+            const monday = new Date(weekKey + 'T00:00:00');
+            return diasClaves.map((k, i) => ({ key: k, fecha: addDays(monday, i) }));
+        }
+
+        function renderizarEncabezado() {
+            const fechas = fechasSemana();
+            const primeraF = fechas[0].fecha, ultimaF = fechas[4].fecha;
+            const mesesNombre = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+            document.getElementById('titulo-semana').textContent =
+                `${primeraF.getDate()} - ${ultimaF.getDate()} de ${mesesNombre[ultimaF.getMonth()]} ${ultimaF.getFullYear()}`;
+
+            const hoyIso = isoDate(new Date());
+            let html = `<div class="p-3 border-r border-gray-200 text-left bg-white">
+                <div class="font-bold text-sm text-gray-800">${mesesNombre[ultimaF.getMonth()]} de ${ultimaF.getFullYear()}</div>
+                <div class="text-[10px] text-gray-400 mt-1">Planificación de Turnos del Equipo</div>
+            </div>`;
+            fechas.forEach(({ key, fecha }) => {
+                const esHoy = isoDate(fecha) === hoyIso;
+                const nAsignados = equipo.filter(m => semanaActual[m.id] && semanaActual[m.id][key] && semanaActual[m.id][key].tipo !== '').length;
+                html += `<div class="p-2 border-r border-gray-200 flex flex-col justify-between ${esHoy ? 'bg-blue-50/60' : ''}">
+                    <div class="flex justify-between items-center px-1">
+                        <span class="font-bold text-lg ${esHoy ? 'text-blue-600 bg-blue-100 rounded-full w-7 h-7 flex items-center justify-center' : 'text-gray-800'}">${fecha.getDate()}</span>
+                        <span class="text-gray-400"><i class="fa-solid fa-users text-[10px]"></i> ${nAsignados}</span>
+                    </div>
+                    <div class="text-right font-${esHoy ? 'bold text-blue-600' : 'medium text-gray-600'}">${diasLabel[key]}</div>
+                </div>`;
+            });
+            document.getElementById('encabezado-dias').innerHTML = html;
+        }
+
+        function estiloTurno(t, pendiente) {
+            if (pendiente) return { clase: "bg-amber-50 border-l-4 border-amber-400 text-amber-700 dashed-pending", icono: '<i class="fa-solid fa-hourglass-half text-amber-500 text-[10px]"></i>' };
+            if (!t || t.tipo === '' || !t.tipo) return null;
+            if (t.tipo === 'fuera') return { clase: "bg-purple-50 border-l-4 border-purple-400 text-purple-700", icono: '<i class="fa-solid fa-house-laptop text-purple-500 text-[10px]"></i>' };
+            if (t.tipo === 'medio_dia') return { clase: "bg-blue-50 border-l-4 border-blue-400 text-blue-700", icono: '<i class="fa-solid fa-business-time text-blue-500 text-[10px]"></i>' };
+            if (t.tipo === 'salida_temprana') return { clase: "bg-orange-50 border-l-4 border-orange-400 text-orange-700", icono: '<i class="fa-solid fa-clock text-orange-500 text-[10px]"></i>' };
+            return { clase: "bg-green-50 border-l-4 border-green-400 text-green-700", icono: '' };
+        }
+
+        function renderizarTabla() {
+            document.getElementById('columna-miembros').innerHTML = '';
+            diasClaves.forEach(dia => { document.getElementById(`dia-${dia}`).innerHTML = ''; });
+
+            let huecos = 0, totalCeldas = 0;
+
+            equipo.forEach(miembro => {
+                const turnosMiembro = semanaActual[miembro.id] || {};
+                let horasSemana = 0;
+                diasClaves.forEach(d => horasSemana += horasTurno(turnosMiembro[d]));
+
+                const divMiembro = document.createElement('div');
+                divMiembro.className = "p-3 h-24 flex items-center justify-between border-b border-gray-200 bg-gray-50/40 group";
+                divMiembro.innerHTML = `
+                    <div class="flex items-center space-x-2 min-w-0">
+                        <div class="w-8 h-8 rounded-full ${miembro.colorBg} flex items-center justify-center text-white font-bold text-[13px] shrink-0">${miembro.inicial}</div>
+                        <div class="min-w-0">
+                            <div class="font-bold text-gray-800 truncate max-w-[160px]">${miembro.nombre}</div>
+                            <div class="text-[10px] text-gray-400">Cel: ${miembro.infoCel}</div>
+                            <div class="text-[10px] text-gray-500 font-semibold mt-0.5"><i class="fa-regular fa-clock"></i> ${horasSemana.toFixed(1)} h / semana</div>
+                        </div>
+                    </div>
+                    <button onclick="eliminarMiembro(${miembro.id})" class="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-500 transition text-xs pr-1" title="Eliminar miembro"><i class="fa-solid fa-trash"></i></button>`;
+                document.getElementById('columna-miembros').appendChild(divMiembro);
+
+                diasClaves.forEach(dia => {
+                    totalCeldas++;
+                    const turno = turnosMiembro[dia];
+                    const solicitudPendiente = solicitudes.find(s => s.weekKey === weekKey && s.miembroId === miembro.id && s.dia === dia && s.estado === 'pendiente');
+                    const contenedorDia = document.getElementById(`dia-${dia}`);
+                    const divCelda = document.createElement('div');
+                    divCelda.className = "h-[92px] p-0.5 border-b border-gray-200/60 flex flex-col justify-center relative group/celda";
+
+                    const analisis = estiloTurno(turno, !!solicitudPendiente);
+
+                    if (analisis) {
+                        const textoHoras = turno && turno.entrada ? `${fmtHora(turno.entrada)} - ${fmtHora(solicitudPendiente ? solicitudPendiente.horaSolicitada : (turno.salida || ''))}` : (turno && turno.motivo ? turno.motivo : 'Sin horario');
+                        divCelda.innerHTML = `
+                            <div class="${analisis.clase} h-full rounded p-2 text-[11px] flex flex-col justify-between shadow-sm cursor-pointer hover:brightness-95 transition select-none"
+                                 onclick="abrirEditor(${miembro.id}, '${dia}')">
+                                <div class="font-semibold truncate">${textoHoras}</div>
+                                <div class="font-mono text-[10px] text-gray-500 flex justify-between items-center gap-1">
+                                    <span class="truncate">${solicitudPendiente ? 'Pend. aprobación' : (turno.motivo || miembro.infoCel)}</span>
+                                    ${analisis.icono}
+                                </div>
+                            </div>
+                            ${solicitudPendiente ? `
+                            <div class="absolute bottom-1 right-1 flex gap-1">
+                                <button onclick="event.stopPropagation(); resolverSolicitud('${solicitudPendiente.id}', true)" class="w-5 h-5 bg-green-500 text-white rounded-full text-[9px] flex items-center justify-center hover:bg-green-600" title="Aprobar"><i class="fa-solid fa-check"></i></button>
+                                <button onclick="event.stopPropagation(); resolverSolicitud('${solicitudPendiente.id}', false)" class="w-5 h-5 bg-red-400 text-white rounded-full text-[9px] flex items-center justify-center hover:bg-red-500" title="Rechazar"><i class="fa-solid fa-xmark"></i></button>
+                            </div>` : `
+                            <button onclick="event.stopPropagation(); abrirSolicitud(${miembro.id}, '${dia}')" class="hidden group-hover/celda:flex absolute top-1 right-1 w-5 h-5 bg-white border border-gray-300 rounded-full text-[9px] items-center justify-center text-gray-500 hover:text-orange-500 hover:border-orange-400" title="Solicitar salida temprana"><i class="fa-solid fa-door-open"></i></button>`}
+                        `;
+                    } else {
+                        huecos++;
+                        divCelda.innerHTML = `
+                            <div class="h-full w-full rounded hover:bg-gray-100 cursor-pointer transition flex items-center justify-center text-gray-300 text-[10px]"
+                                 onclick="abrirEditor(${miembro.id}, '${dia}')">+ asignar</div>`;
+                    }
+                    contenedorDia.appendChild(divCelda);
+                });
+            });
+
+            document.getElementById('resumen-huecos').textContent = `${huecos} de ${totalCeldas} celdas sin asignar esta semana`;
+        }
+
+        // ---------- NAVEGACIÓN DE SEMANA ----------
+        async function cambiarSemana(delta) {
+            const monday = new Date(weekKey + 'T00:00:00');
+            weekKey = isoDate(addDays(monday, delta * 7));
+            document.getElementById('loader').classList.remove('hidden');
+            await cargarSemana(false);
+            document.getElementById('loader').classList.add('hidden');
+        }
+        async function irHoy() {
+            weekKey = isoDate(lunesDe(new Date()));
+            document.getElementById('loader').classList.remove('hidden');
+            await cargarSemana(true);
+            document.getElementById('loader').classList.add('hidden');
+        }
+
+        // ---------- EDITOR DE TURNO ----------
+        function actualizarCamposEditor() {
+            const tipo = document.getElementById('input-tipo').value;
+            document.getElementById('fila-horas').style.display = (tipo === '') ? 'none' : 'grid';
+            document.getElementById('fila-motivo').style.display = (tipo === 'fuera' || tipo === 'salida_temprana' || tipo === 'medio_dia') ? 'block' : 'none';
+        }
+
+        function abrirEditor(miembroId, dia) {
+            celdaSeleccionada = { miembroId, dia };
+            const miembro = equipo.find(m => m.id === miembroId);
+            const turno = (semanaActual[miembroId] || {})[dia];
+            document.getElementById('editor-subtitulo').textContent = `${miembro.nombre} · ${diasLabel[dia]}`;
+
+            document.getElementById('input-tipo').value = turno ? (turno.tipo || '') : 'normal';
+            document.getElementById('input-entrada').value = turno ? (turno.entrada || '') : '07:30';
+            document.getElementById('input-salida').value = turno ? (turno.salida || '') : '17:00';
+            document.getElementById('input-motivo').value = turno ? (turno.motivo || '') : '';
+            actualizarCamposEditor();
+            document.getElementById('modal-editor').classList.remove('hidden');
+            document.getElementById('modal-editor').classList.add('flex');
+        }
+
+        async function guardarCambiosTurno() {
+            const { miembroId, dia } = celdaSeleccionada;
+            const tipo = document.getElementById('input-tipo').value;
+            if (!semanaActual[miembroId]) semanaActual[miembroId] = {};
+
+            if (tipo === '') {
+                semanaActual[miembroId][dia] = null;
+            } else {
+                semanaActual[miembroId][dia] = {
+                    tipo,
+                    entrada: document.getElementById('input-entrada').value,
+                    salida: document.getElementById('input-salida').value,
+                    motivo: document.getElementById('input-motivo').value.trim()
+                };
+            }
+            await guardar(`semana:${weekKey}`, semanaActual);
+            const miembro = equipo.find(m => m.id === miembroId);
+            await registrarHistorial(`${miembro.nombre}: turno de ${diasLabel[dia]} actualizado (${tipo || 'vacío'}).`);
+            cerrarModal('modal-editor');
+            renderizarEncabezado();
+            renderizarTabla();
+        }
+
+        async function borrarTurno() {
+            const { miembroId, dia } = celdaSeleccionada;
+            if (semanaActual[miembroId]) semanaActual[miembroId][dia] = null;
+            await guardar(`semana:${weekKey}`, semanaActual);
+            const miembro = equipo.find(m => m.id === miembroId);
+            await registrarHistorial(`${miembro.nombre}: turno de ${diasLabel[dia]} eliminado.`);
+            cerrarModal('modal-editor');
+            renderizarEncabezado();
+            renderizarTabla();
+        }
+
+        // ---------- SOLICITUDES DE SALIDA TEMPRANA ----------
+        function abrirSolicitud(miembroId, dia) {
+            solicitudContexto = { miembroId, dia };
+            const miembro = equipo.find(m => m.id === miembroId);
+            const turno = (semanaActual[miembroId] || {})[dia];
+            document.getElementById('solicitud-subtitulo').textContent =
+                `${miembro.nombre} · ${diasLabel[dia]}${turno && turno.salida ? ' · salida actual ' + fmtHora(turno.salida) : ''}`;
+            document.getElementById('input-hora-solicitud').value = turno && turno.salida ? turno.salida : '16:00';
+            document.getElementById('input-motivo-solicitud').value = '';
+            document.getElementById('modal-solicitud').classList.remove('hidden');
+            document.getElementById('modal-solicitud').classList.add('flex');
+        }
+
+        async function enviarSolicitud() {
+            const { miembroId, dia } = solicitudContexto;
+            const horaSolicitada = document.getElementById('input-hora-solicitud').value;
+            const motivo = document.getElementById('input-motivo-solicitud').value.trim();
+            if (!horaSolicitada) { alert('Indica la nueva hora de salida.'); return; }
+
+            const miembro = equipo.find(m => m.id === miembroId);
+            const nueva = {
+                id: `${Date.now()}-${miembroId}`,
+                miembroId, dia, weekKey, horaSolicitada, motivo,
+                estado: 'pendiente', ts: new Date().toISOString()
+            };
+            solicitudes.push(nueva);
+            await guardar('solicitudes', solicitudes);
+            await registrarHistorial(`${miembro.nombre} solicitó salida temprana el ${diasLabel[dia]} a las ${fmtHora(horaSolicitada)}.`);
+            cerrarModal('modal-solicitud');
+            renderizarTabla();
+            actualizarBadges();
+        }
+
+        async function resolverSolicitud(id, aprobar) {
+            const sol = solicitudes.find(s => s.id === id);
+            if (!sol) return;
+            const miembro = equipo.find(m => m.id === sol.miembroId);
+
+            if (aprobar) {
+                if (!semanaActual[sol.miembroId]) semanaActual[sol.miembroId] = {};
+                const actual = semanaActual[sol.miembroId][sol.dia] || { entrada: '07:30', motivo: '' };
+                semanaActual[sol.miembroId][sol.dia] = {
+                    tipo: 'salida_temprana',
+                    entrada: actual.entrada || '07:30',
+                    salida: sol.horaSolicitada,
+                    motivo: sol.motivo
+                };
+                await guardar(`semana:${weekKey}`, semanaActual);
+                await registrarHistorial(`Aprobada: salida temprana de ${miembro.nombre} el ${diasLabel[sol.dia]} a las ${fmtHora(sol.horaSolicitada)}.`);
+            } else {
+                await registrarHistorial(`Rechazada: solicitud de salida temprana de ${miembro.nombre} (${diasLabel[sol.dia]}).`);
+            }
+
+            solicitudes = solicitudes.filter(s => s.id !== id);
+            await guardar('solicitudes', solicitudes);
+            renderizarTabla();
+            actualizarBadges();
+            if (!document.getElementById('panel-lateral').classList.contains('hidden')) renderizarPanel();
+        }
+
+        // ---------- HISTORIAL ----------
+        async function registrarHistorial(texto) {
+            historial.unshift({ texto, ts: new Date().toISOString() });
+            historial = historial.slice(0, 50);
+            await guardar('historial', historial);
+        }
+
+        // ---------- PANEL LATERAL ----------
+        function abrirPanel(tab) {
+            tabActivo = tab;
+            document.getElementById('panel-lateral').classList.remove('hidden');
+            renderizarPanel();
+        }
+        function cerrarPanel() { document.getElementById('panel-lateral').classList.add('hidden'); }
+        function cambiarTab(tab) { tabActivo = tab; renderizarPanel(); }
+
+        function renderizarPanel() {
+            const tabSol = document.getElementById('tab-solicitudes');
+            const tabHist = document.getElementById('tab-historial');
+            tabSol.className = `flex-1 py-3 text-xs font-bold border-b-2 ${tabActivo === 'solicitudes' ? 'text-blue-600 border-blue-600' : 'text-gray-500 border-transparent'}`;
+            tabHist.className = `flex-1 py-3 text-xs font-bold border-b-2 ${tabActivo === 'historial' ? 'text-blue-600 border-blue-600' : 'text-gray-500 border-transparent'}`;
+
+            const contenedor = document.getElementById('contenido-panel');
+            if (tabActivo === 'solicitudes') {
+                if (solicitudes.length === 0) {
+                    contenedor.innerHTML = `<div class="text-center text-gray-400 text-xs py-10">No hay solicitudes pendientes.</div>`;
+                    return;
+                }
+                contenedor.innerHTML = solicitudes.slice().reverse().map(s => {
+                    const miembro = equipo.find(m => m.id === s.miembroId);
+                    return `<div class="border border-amber-200 bg-amber-50 rounded p-3">
+                        <div class="font-bold text-gray-800 text-xs">${miembro ? miembro.nombre : 'Miembro eliminado'}</div>
+                        <div class="text-[11px] text-gray-500">${diasLabel[s.dia]} · semana del ${s.weekKey}${s.weekKey !== weekKey ? ' (otra semana)' : ''}</div>
+                        <div class="text-[11px] text-gray-600 mt-1">Nueva salida: <b>${fmtHora(s.horaSolicitada)}</b>${s.motivo ? ' — ' + s.motivo : ''}</div>
+                        <div class="flex gap-2 mt-2">
+                            <button onclick="resolverSolicitud('${s.id}', true)" class="flex-1 bg-green-500 text-white text-[11px] font-semibold py-1 rounded hover:bg-green-600">Aprobar</button>
+                            <button onclick="resolverSolicitud('${s.id}', false)" class="flex-1 bg-white border border-red-300 text-red-500 text-[11px] font-semibold py-1 rounded hover:bg-red-50">Rechazar</button>
+                        </div>
+                    </div>`;
+                }).join('');
+            } else {
+                if (historial.length === 0) {
+                    contenedor.innerHTML = `<div class="text-center text-gray-400 text-xs py-10">Aún no hay cambios registrados.</div>`;
+                    return;
+                }
+                contenedor.innerHTML = historial.map(h => {
+                    const fecha = new Date(h.ts);
+                    return `<div class="border-b border-gray-100 pb-2">
+                        <div class="text-[11px] text-gray-700">${h.texto}</div>
+                        <div class="text-[10px] text-gray-400">${fecha.toLocaleString('es-CO')}</div>
+                    </div>`;
+                }).join('');
+            }
+        }
+
+        function actualizarBadges() {
+            const badge = document.getElementById('badge-solicitudes');
+            const n = solicitudes.length;
+            if (n > 0) { badge.classList.remove('hidden'); badge.textContent = n; }
+            else { badge.classList.add('hidden'); }
+        }
+
+        // ---------- MODALES ----------
+        function cerrarModal(id) {
+            document.getElementById(id).classList.add('hidden');
+            document.getElementById(id).classList.remove('flex');
+        }
+
+        // ---------- MIEMBROS ----------
+        async function agregarMiembro() {
+            const nombre = prompt("Nombre completo del nuevo integrante:");
+            if (!nombre) return;
+            const cel = prompt("Número de celular:") || '';
+            const nuevoId = Date.now();
+            equipo.push({
+                id: nuevoId, nombre, infoCel: cel,
+                inicial: nombre.charAt(0).toUpperCase(),
+                colorBg: paletaColores[equipo.length % paletaColores.length]
+            });
+            await guardar('equipo', equipo);
+            await registrarHistorial(`${nombre} fue agregado al equipo.`);
+            renderizarEncabezado();
+            renderizarTabla();
+        }
+
+        async function eliminarMiembro(id) {
+            const miembro = equipo.find(m => m.id === id);
+            if (!miembro) return;
+            if (!confirm(`¿Eliminar a ${miembro.nombre} del equipo? Esto no borra su historial de turnos pasados.`)) return;
+            equipo = equipo.filter(m => m.id !== id);
+            await guardar('equipo', equipo);
+            await registrarHistorial(`${miembro.nombre} fue eliminado del equipo.`);
+            renderizarEncabezado();
+            renderizarTabla();
+        }
+
+        // ---------- EXPORTAR CSV ----------
+        function exportarCSV() {
+            let filas = [['Integrante', 'Día', 'Tipo', 'Entrada', 'Salida', 'Motivo']];
+            equipo.forEach(m => {
+                diasClaves.forEach(d => {
+                    const t = (semanaActual[m.id] || {})[d];
+                    if (t) filas.push([m.nombre, diasLabel[d], t.tipo, t.entrada || '', t.salida || '', t.motivo || '']);
+                });
+            });
+            const csv = filas.map(f => f.map(c => `"${(c + '').replace(/"/g, '""')}"`).join(',')).join('\n');
+            const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url; a.download = `cronograma_${weekKey}.csv`;
+            document.body.appendChild(a); a.click(); document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        iniciar();
+    </script>
+</body>
+</html>
